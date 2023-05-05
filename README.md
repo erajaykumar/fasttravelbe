@@ -1,6 +1,9 @@
 # fasttravelbe
 POC ride sharing app
 
+Master branch is template for creating new branch which doesn't require project files.
+
+Please branch out out of Develop branch and create pull request for changes which needs to be merged to Develop branch.
 
 ## Run Locally
 
