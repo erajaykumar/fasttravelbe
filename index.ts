@@ -72,6 +72,7 @@ export const registerUserResponse = {
 //   "vehicleRegistrationNumber":"VEH_NO_TEST_DL_34 1234"  
 // };
 
+import { createBookingResponse, mockBooking, registerUserResponse } from './mockResponses';
 //load environment variables
 dotenv.config({
   path: './config/config.env',
