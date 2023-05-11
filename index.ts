@@ -3,6 +3,7 @@ import { graphqlHTTP } from 'express-graphql';
 import { GraphQLString, buildSchema } from 'graphql';
 import { GraphQLObjectType } from 'graphql';
 import dotenv from 'dotenv';
+import cors from 'cors';
 
 import { GraphQLScalarType } from 'graphql';
 
@@ -80,6 +81,8 @@ dotenv.config({
 const PORT = process.env.PORT;
 
 const app: Express = express();
+app.use(cors());
+
 
 //Body parser
 app.use(express.json());
@@ -159,12 +162,17 @@ const schema = buildSchema(`
     pincode: String
   }
   input UserDataInputType {
+    password:String,
     firstName: String,
     lastName: String,
     gender: genderEnum,
     emailAddress: String,
     userType: userTypeEnum,
     dob: String,
+    state:String,
+    city:String,
+    district:String,
+    pinCode:String,
     address: AddressInputType,
     mobileNumber: String,
     drivingLicenseNumber: String,
@@ -260,6 +268,7 @@ const root = {
     console.log(bookingData);
     return createBookingResponse;
   },
+  
   registerUser({ userData }: any) {
     console.log(userData);
     return registerUserResponse;
