@@ -5,74 +5,8 @@ import { GraphQLObjectType } from 'graphql';
 import dotenv from 'dotenv';
 import cors from 'cors';
 
-import { GraphQLScalarType } from 'graphql';
+import { createBookingResponse, mockBooking, registerUserResponse } from './_data/mockResponses';
 
-export const createBookingResponse = {
-  "bookingId":"bid_100001",
-  "origin":"Rajiv chowk, gurgaon",
-  "destination":"Railway station, Anand Vihar, New Delhi",
-  "fare": 550,
-  "riderId":"ruid_000001",
-  "partnerId":"puid_000001",
-  "vehicleId":"vid_000001",
-  "status":"IN_PROGRESS",
-  "createdAt": new Date().toDateString(),
-  "completedAt": new Date(+new Date() + 55 * 60 * 1000).toDateString(),
-  "scheduledCompletionTime": new Date(+new Date() + 54 * 60 * 1000).toDateString()
-}
-
-export const mockBooking = {
-  "bookingId":"bid_100002",
-  "origin":"MG Road, gurgaon",
-  "destination":"Railway station, Old delhi",
-  "fare": 750,
-  "riderId":"ruid_000001",
-  "partnerId":"puid_000001",
-  "vehicleId":"vid_000001",
-  "status":"COMPLETED",
-  "createdAt": new Date(+new Date() - 20 * 60 * 60 * 1000).toDateString(),
-  "completedAt": new Date(+new Date() - 18.5 * 60 * 60 * 1000).toDateString(),
-  "scheduledCompletionTime": new Date(+new Date() -18.5 * 60 * 60 * 1000).toDateString()
-}
-
-// export const getBookingsResponse = [createBookingResponse, mockBooking];
-
-export const registerUserResponse = {
-  "userId":"puid_000001",
-  // "password":"test@1234",
-  "jwt": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwiaWF0IjoxNTE2MjM5MDIyLCJ1c2VySWQiOiJydWlkXzAwMDAwMSIsInBhc3N3b3JkIjoidGVzdEAxMjM0In0.Zx5OlAmrAK9hlf3yXxmG6klxlruGDJy55tkFhVL9ZSI",
-  "firstName":"Test",
-  "lastName":"User 1",
-  "gender":"M",
-  "emailAddress":"test1@tester.com",
-  "userType":"PARTNER",
-  "dob": new Date(+new Date() - 30 * 365 * 24 * 60 * 60 * 1000).toDateString(),
-  "address":
-    {"addressLine":"line 1","addressLine2":"line2","city":"text city","state":"test state","country":"test country","pincode":"100001"},
-  "mobileNumber":"8765432109",
-  "drivingLicenseNumber":"DL_NO_TEST_1234",
-  "vehicleRegistrationNumber":"VEH_NO_TEST_DL_34 1234",
-  "createdAt": new Date(+new Date() -  50 * 24 * 60 * 60 * 1000).toDateString(),
-};
-
-// export const signInResponse = {
-//   "userId":"puid_000001",
-//   // "password":"test@1234",
-//   "jwt": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwiaWF0IjoxNTE2MjM5MDIyLCJ1c2VySWQiOiJydWlkXzAwMDAwMSIsInBhc3N3b3JkIjoidGVzdEAxMjM0In0.Zx5OlAmrAK9hlf3yXxmG6klxlruGDJy55tkFhVL9ZSI",
-//   "firstName":"Test",
-//   "lastName":"User 1",
-//   "gender":"M",
-//   "emailAddress":"test1@tester.com",
-//   "userType":"PARTNER",
-//   "dob":new Date(+new Date() - 30 * 365 * 24 * 60 * 60 * 1000),
-//   "address":
-//     {"addressLine":"line 1","addressLine2":"line2","city":"text city","state":"test state","country":"test country","pincode":"100001"},
-//   "mobileNumber":"8765432109",
-//   "drivingLicenseNumber":"DL_NO_TEST_1234",
-//   "vehicleRegistrationNumber":"VEH_NO_TEST_DL_34 1234"  
-// };
-
-import { createBookingResponse, mockBooking, registerUserResponse } from './mockResponses';
 //load environment variables
 dotenv.config({
   path: './config/config.env',
@@ -87,16 +21,6 @@ app.use(cors());
 
 //Body parser
 app.use(express.json());
-
-// type DateScalar = new GraphQLScalarType({
-//   name: 'Date',
-//   parseValue(value: any) {
-//     return new Date(value);
-//   },
-//   serialize(value: any) {
-//     return value.toISOString();
-//   },
-// })
 
 const schema = buildSchema(`
 
@@ -230,7 +154,6 @@ class Todo {
 
 let baseId = 100000;
 
-// let todos: ToDoType  = {id: '', text: ''};
 const root = {
   getTodo: (data: any) => {
     const matchingTodo = todos.find(item => item?.id === data?.id);
@@ -286,15 +209,6 @@ app.use('/graphql', graphqlHTTP({
   graphiql: true,
 }))
 
-// const server = new ApolloServer({
-//   typeDefs,
-//   resolvers: {
-//     Date: DateScalar,
-//     // Remaining resolvers..
-//   },
-// });
-
-
 
 //Temporarily catch all the get request and serve static content
 app.get('/', (req: Request, res:Response) => {
@@ -308,46 +222,3 @@ app.listen(
     console.log(`Server running in ${process.env.NODE_ENV} on port ${PORT}`);
   }
 );
-
-
-
-
-// // // Construct a schema, using GraphQL schema language
-// var schema = buildSchema(`
-//   type Query {
-//     hello: String,
-//     bye(input: MessageInput): [Message]
-//   },
-//   input MessageInput {
-//     content: String
-//     author: String,
-//   }
-//   type Message {
-//     content: String
-//     author: String
-//   }
-// `)
-
-// // type Mutation {
-// //   createBooking: CreateBookingType
-// // }
-
-
-// // The root provides a resolver function for each API endpoint
-// var root = {
-//   hello: () => {
-//     return "Hello world!"
-//   },
-//   bye: (input: {content: String, author: String}) => {
-//     const { content, author } = input;
-//     console.log(content, author);
-//     const returnValue = [];
-//     for(let i=0; i<3; i++) {
-//       returnValue.push({ content, author })
-//     }
-//     return returnValue;
-//   },
-//   // createBooking: () => {
-//   //   return createBookingMock
-//   // }
-// }
