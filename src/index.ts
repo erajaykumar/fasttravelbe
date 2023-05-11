@@ -1,11 +1,10 @@
 import express, { Express, Request, Response } from 'express';
 import { graphqlHTTP } from 'express-graphql';
-import { GraphQLString, buildSchema } from 'graphql';
-import { GraphQLObjectType } from 'graphql';
+import { GraphQLString, buildSchema, graphql, GraphQLSchema, GraphQLInt, GraphQLList, GraphQLID, GraphQLObjectType  } from 'graphql';
 import dotenv from 'dotenv';
 import cors from 'cors';
-import mongoose from 'mongoose';
-
+import mongoose, { Schema } from 'mongoose';
+import Booking from './models/booking'
 import { createBookingResponse, mockBooking, registerUserResponse } from './_data/mockResponses';
 
 //load environment variables
@@ -204,8 +203,33 @@ const root = {
     return createBookingResponse;
   },
   createBooking({ bookingData }: any) {
-    console.log(bookingData);
-    return createBookingResponse;
+    // console.log(bookingData);
+    // console.log(Booking);
+    // console.log(bookingData);
+    let bookingDetails= new Booking();
+    const bookingId: string=`bid_${Math.floor(1000 + Math.random() * 9000).toString()}`;
+    console.log("booking id is : "+bookingId);
+
+    bookingDetails.bookingId= bookingId;
+    bookingDetails.origin=bookingData.origin;
+    bookingDetails.destination=bookingData.destination;
+    bookingDetails.fare=bookingData.fare;
+    bookingDetails.riderId="ruid_000001";
+    bookingDetails.partnerId="puid_000001";
+    bookingDetails.vehicleId="vid_000001";
+    bookingDetails.status="IN_PROGRESS";
+    bookingDetails.vehicleId="vid_000001";
+    return bookingDetails.save().then( savedDoc=> {
+
+      console.log("Saved succesffully!");
+      
+      console.log(savedDoc);
+
+      return savedDoc;
+    }).catch(err=>{
+      console.log("Error occurred while saving document!");
+      console.log(err);
+    });
   },
   
   registerUser({ userData }: any) {
