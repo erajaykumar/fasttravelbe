@@ -6,7 +6,7 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "SET NODE_ENV=production && node server",
-    "dev": "concurrently \"npx tsc --watch\" \"nodemon -q dist/index.js\"",
+    "dev": "tsc -p tsconfig.json && nodemon -q dist/index.js",
     "build": "tsc -p tsconfig.json",
     "clean": "rimraf coverage dist tmp"
   },
@@ -25,7 +25,8 @@
     "dotenv": "^16.0.3",
     "express": "^4.18.2",
     "express-graphql": "^0.12.0",
-    "graphql": "^15.3.0"
+    "graphql": "^15.3.0",
+    "mongoose": "^7.1.1"
   },
   "devDependencies": {
     "@types/cors": "^2.8.13",

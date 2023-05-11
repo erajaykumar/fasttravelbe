@@ -4,20 +4,35 @@ import { GraphQLString, buildSchema } from 'graphql';
 import { GraphQLObjectType } from 'graphql';
 import dotenv from 'dotenv';
 import cors from 'cors';
+import mongoose from 'mongoose';
 
 import { createBookingResponse, mockBooking, registerUserResponse } from './_data/mockResponses';
 
 //load environment variables
 dotenv.config({
-  path: './config/config.env',
+  path: 'config/.env.development',
 });
 
 //Initialize microservice port 
 const PORT = process.env.PORT;
 
+//Mongo DB setup starts
+
+const MONGODBURI:string = process.env.MONGO_URI ?? "URI NOT Found!"
+
+mongoose.connect(MONGODBURI).catch((err)=>{
+  console.error(err);
+  console.error(`Error occured while connecting to DB ${err.message}`);
+});
+
+mongoose.connection.once('open', ()=>{
+  console.log(`Connected to database`);
+})
+
+//Mongo DB setup ends
+
 const app: Express = express();
 app.use(cors());
-
 
 //Body parser
 app.use(express.json());
