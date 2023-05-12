@@ -11,6 +11,8 @@ import {
   registerUserResponse,
 } from './_data/mockResponses';
 
+import { bookingStatusEnum, userTypeEnum, genderEnum, vehicleStatusEnum } from './common/enums';
+
 //load environment variables
 dotenv.config({
   path: 'config/.env.development',
@@ -142,7 +144,7 @@ const schema = buildSchema(`
   }
   type Query {
     getTodo(id: ID!): Todo,
-    getBookings(userId: ID!): [BookingDataType],
+    getBookings(userId: ID!, userType: userTypeEnum): [BookingDataType],
     getBookingById(bookingId: ID!): BookingDataType
   }
   type Mutation {
@@ -173,50 +175,44 @@ class Todo {
 let baseId = 100000;
 
 const root = {
-  getBookings({ userId }: any) {
+  async getBookings({ userId, userType }: any) {
     console.log(userId);
-    return Booking.find();
+    const filter: any = {};
+    if (userType === userTypeEnum.RIDER) {
+      filter.riderId = userId;
+    } else if (userType === userTypeEnum.PARTNER) {
+      filter.partnerId = userId;
+    }
+    const bookings = await Booking.find(filter);
+    return bookings;
   },
   async getBookingById({ bookingId }: any) {
-    const searchId: string = bookingId;
-    console.log('Search string : ' + searchId);
-    let res: any;
-    res = await Booking.find({ bookingId: searchId });
-    console.log(`res is ${res}`);
-    return res;
+    console.log('Search string : ' + bookingId);
+    const booking = await Booking.findOne({ bookingId });
+    console.log('Booking data:', booking);
+    return booking;
   },
-  createBooking({ bookingData }: any) {
-    let bookingDetails = new Booking();
+  
+  async createBooking({ bookingData }: any) {
 
     const bookingId: string = `bid_${Math.floor(
-      1000 + Math.random() * 9000
+      1000 + Math.random() * 900000
     ).toString()}`;
 
     console.log('booking id is : ' + bookingId);
 
-    bookingDetails.bookingId = bookingId;
-    bookingDetails.origin = bookingData.origin;
-    bookingDetails.destination = bookingData.destination;
-    bookingDetails.fare = bookingData.fare;
-    bookingDetails.riderId = 'ruid_000001';
-    bookingDetails.partnerId = 'puid_000001';
-    bookingDetails.vehicleId = 'vid_000001';
-    bookingDetails.status = 'IN_PROGRESS';
-    bookingDetails.vehicleId = 'vid_000001';
+    bookingData.bookingId = bookingId;
+    bookingData.partnerId = 'pid_000001';
+    bookingData.vehicleId = 'vid_000001';
+    bookingData.status = bookingStatusEnum.IN_PROGRESS;
 
-    return bookingDetails
-      .save()
-      .then((savedDoc) => {
-        console.log('Saved succesffully!');
-
-        console.log(savedDoc);
-
-        return savedDoc;
-      })
-      .catch((err) => {
-        console.log('Error occurred while saving document!');
-        console.log(err);
-      });
+    try {
+      const booking = await Booking.create(bookingData);
+      console.log('Saved succesffully!', booking);
+      return booking;  
+    } catch(err) {
+      throw new Error('Server issue, could not create a booking! Please try again.');
+    }
   },
 
   registerUser({ userData }: any) {
