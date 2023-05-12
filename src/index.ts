@@ -4,29 +4,33 @@ import { GraphQLString, buildSchema, graphql, GraphQLSchema, GraphQLInt, GraphQL
 import dotenv from 'dotenv';
 import cors from 'cors';
 import mongoose, { Schema } from 'mongoose';
-import Booking from './models/booking'
-import { createBookingResponse, mockBooking, registerUserResponse } from './_data/mockResponses';
+import Booking from './models/booking';
+import {
+  createBookingResponse,
+  mockBooking,
+  registerUserResponse,
+} from './_data/mockResponses';
 
 //load environment variables
 dotenv.config({
   path: 'config/.env.development',
 });
 
-//Initialize microservice port 
+//Initialize microservice port
 const PORT = process.env.PORT;
 
 //Mongo DB setup starts
 
-const MONGODBURI:string = process.env.MONGO_URI ?? "URI NOT Found!"
+const MONGODBURI: string = process.env.MONGO_URI ?? 'URI NOT Found!';
 
-mongoose.connect(MONGODBURI).catch((err)=>{
+mongoose.connect(MONGODBURI).catch((err) => {
   console.error(err);
   console.error(`Error occured while connecting to DB ${err.message}`);
 });
 
-mongoose.connection.once('open', ()=>{
+mongoose.connection.once('open', () => {
   console.log(`Connected to database`);
-})
+});
 
 //Mongo DB setup ends
 
@@ -150,15 +154,15 @@ const schema = buildSchema(`
   }
 `);
 
-type ToDoType = {id: string, text: string, completed: boolean};
-type TodoListType = [ToDoType?]; 
+type ToDoType = { id: string; text: string; completed: boolean };
+type TodoListType = [ToDoType?];
 
 const todos: TodoListType = [];
 
 class Todo {
-  id: string
-  text: string
-  completed: boolean
+  id: string;
+  text: string;
+  completed: boolean;
   constructor(id: string, text: string) {
     this.id = id;
     this.text = text;
@@ -169,69 +173,52 @@ class Todo {
 let baseId = 100000;
 
 const root = {
-  getTodo: (data: any) => {
-    const matchingTodo = todos.find(item => item?.id === data?.id);
-    if (!matchingTodo) {
-      throw new Error('Todo not found.');
-    }
-    return matchingTodo;
-  },
-  createTodo: (data: any) => {
-    const {text} = data?.input;
-    const id = ++baseId;
-    const todo = new Todo(id.toString(), text);
-    todos.push(todo);
-    return todo;
-  },
-  updateTodo: (data: any) => {
-    const id = data.id;
-    const { text, completed } = data?.input;
-    const matchingTodo = todos.find(item => item?.id === id);
-    if (!matchingTodo) {
-      throw new Error('Todo not found.');
-    }
-    matchingTodo.text = text || matchingTodo.text;
-    matchingTodo.completed = completed || matchingTodo.completed;
-    return matchingTodo;
-  },
-  getBookings({userId}: any) {
+  getBookings({ userId }: any) {
     console.log(userId);
-    return [createBookingResponse, mockBooking];
+    return Booking.find();
   },
-  getBookingById({bookingId}: any) {
-    console.log(bookingId);
-    return createBookingResponse;
+  async getBookingById({ bookingId }: any) {
+    const searchId: string = bookingId;
+    console.log('Search string : ' + searchId);
+    let res: any;
+    res = await Booking.find({ bookingId: searchId });
+    console.log(`res is ${res}`);
+    return res;
   },
   createBooking({ bookingData }: any) {
-    // console.log(bookingData);
-    // console.log(Booking);
-    // console.log(bookingData);
-    let bookingDetails= new Booking();
-    const bookingId: string=`bid_${Math.floor(1000 + Math.random() * 9000).toString()}`;
-    console.log("booking id is : "+bookingId);
+    let bookingDetails = new Booking();
 
-    bookingDetails.bookingId= bookingId;
-    bookingDetails.origin=bookingData.origin;
-    bookingDetails.destination=bookingData.destination;
-    bookingDetails.fare=bookingData.fare;
-    bookingDetails.riderId="ruid_000001";
-    bookingDetails.partnerId="puid_000001";
-    bookingDetails.vehicleId="vid_000001";
-    bookingDetails.status="IN_PROGRESS";
-    bookingDetails.vehicleId="vid_000001";
-    return bookingDetails.save().then( savedDoc=> {
+    const bookingId: string = `bid_${Math.floor(
+      1000 + Math.random() * 9000
+    ).toString()}`;
 
-      console.log("Saved succesffully!");
-      
-      console.log(savedDoc);
+    console.log('booking id is : ' + bookingId);
 
-      return savedDoc;
-    }).catch(err=>{
-      console.log("Error occurred while saving document!");
-      console.log(err);
-    });
+    bookingDetails.bookingId = bookingId;
+    bookingDetails.origin = bookingData.origin;
+    bookingDetails.destination = bookingData.destination;
+    bookingDetails.fare = bookingData.fare;
+    bookingDetails.riderId = 'ruid_000001';
+    bookingDetails.partnerId = 'puid_000001';
+    bookingDetails.vehicleId = 'vid_000001';
+    bookingDetails.status = 'IN_PROGRESS';
+    bookingDetails.vehicleId = 'vid_000001';
+
+    return bookingDetails
+      .save()
+      .then((savedDoc) => {
+        console.log('Saved succesffully!');
+
+        console.log(savedDoc);
+
+        return savedDoc;
+      })
+      .catch((err) => {
+        console.log('Error occurred while saving document!');
+        console.log(err);
+      });
   },
-  
+
   registerUser({ userData }: any) {
     console.log(userData);
     return registerUserResponse;
@@ -242,22 +229,23 @@ const root = {
   },
 };
 
-app.use('/graphql', graphqlHTTP({
-  schema: schema,
-  rootValue: root,
-  graphiql: true,
-}))
-
+app.use(
+  '/graphql',
+  graphqlHTTP({
+    schema: schema,
+    rootValue: root,
+    graphiql: true,
+  })
+);
 
 //Temporarily catch all the get request and serve static content
-app.get('/', (req: Request, res:Response) => {
-  res.send('<h1><center>Welcome to Fast Travel APIs (Express + TypeScript)..</center></h1>');
+app.get('/', (req: Request, res: Response) => {
+  res.send(
+    '<h1><center>Welcome to Fast Travel APIs (Express + TypeScript)..</center></h1>'
+  );
 });
 
 //Start server
-app.listen(
-  PORT,
-  () => {
-    console.log(`Server running in ${process.env.NODE_ENV} on port ${PORT}`);
-  }
-);
+app.listen(PORT, () => {
+  console.log(`Server running in ${process.env.NODE_ENV} on port ${PORT}`);
+});
