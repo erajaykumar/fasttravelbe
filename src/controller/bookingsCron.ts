@@ -1,6 +1,7 @@
 import Booking from "../models/booking";
 import cronJob, { ScheduledTask } from "node-cron";
 import { Types } from "mongoose";
+import { bookingStatusEnum } from "../common/enums";
 
 let task: ScheduledTask;
 
@@ -9,7 +10,7 @@ const updateBookings = async () => {
     //Find all the bookings where status is IN_PROGRESS and scheduledCompletionTime as passed
     const bookings = await Booking.find(
       {
-        status: "IN_PROGRESS",
+        status: bookingStatusEnum.IN_PROGRESS,
         scheduledCompletionTime: { $lte: new Date() },
       },
       ["bookingId"]
@@ -22,8 +23,8 @@ const updateBookings = async () => {
           {
             bookingId: booking.bookingId,
           },
-          { status: "COMPLETED", completedAt: new Date() }
-        ); //{status: "COMPLETED"}
+          { status: bookingStatusEnum.COMPLETED, completedAt: new Date() }
+        );
       }
     }
   } catch (error: any) {
