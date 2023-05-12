@@ -10,6 +10,7 @@ import {
   mockBooking,
   registerUserResponse,
 } from './_data/mockResponses';
+import cron from "./controller/bookingsCron";
 
 //load environment variables
 dotenv.config({
@@ -30,6 +31,7 @@ mongoose.connect(MONGODBURI).catch((err) => {
 
 mongoose.connection.once('open', () => {
   console.log(`Connected to database`);
+  cron.init();
 });
 
 //Mongo DB setup ends
