@@ -1,22 +1,46 @@
-import express, { Express, Request, Response } from 'express';
-import { graphqlHTTP } from 'express-graphql';
-import { GraphQLString, buildSchema, graphql, GraphQLSchema, GraphQLInt, GraphQLList, GraphQLID, GraphQLObjectType  } from 'graphql';
-import dotenv from 'dotenv';
-import cors from 'cors';
-import mongoose, { Schema } from 'mongoose';
-import Booking from './models/booking';
+import express, { Express, Request, Response } from "express";
+import { graphqlHTTP } from "express-graphql";
+import {
+  GraphQLString,
+  buildSchema,
+  graphql,
+  GraphQLSchema,
+  GraphQLInt,
+  GraphQLList,
+  GraphQLID,
+  GraphQLObjectType,
+} from "graphql";
+import dotenv from "dotenv";
+import cors from "cors";
+import mongoose, { Schema } from "mongoose";
+import Booking from "./models/booking";
 import {
   createBookingResponse,
   mockBooking,
   registerUserResponse,
-} from './_data/mockResponses';
+} from "./_data/mockResponses";
 import cron from "./controller/bookingsCron";
+import bcrypt from "bcrypt";
 
-import { bookingStatusEnum, userTypeEnum, genderEnum, vehicleStatusEnum } from './common/enums';
+// import {
+//   createBookingResponse,
+//   mockBooking,
+//   registerUserResponse,
+// } from './_data/mockResponses';
+import {
+  bookingStatusEnum,
+  userTypeEnum,
+  genderEnum,
+  vehicleStatusEnum,
+} from "./common/enums";
+import { UserModel } from "./models/user";
+import { getNewId } from "./common/utils";
+import { authorize, createAccessToken, encryptPassword } from "./common/auth";
+import { IncomingMessage } from "http";
 
 //load environment variables
 dotenv.config({
-  path: 'config/.env.development',
+  path: "config/.env.development",
 });
 
 //Initialize microservice port
@@ -24,14 +48,14 @@ const PORT = process.env.PORT;
 
 //Mongo DB setup starts
 
-const MONGODBURI: string = process.env.MONGO_URI ?? 'URI NOT Found!';
+const MONGODBURI: string = process.env.MONGO_URI ?? "URI NOT Found!";
 
 mongoose.connect(MONGODBURI).catch((err) => {
   console.error(err);
   console.error(`Error occured while connecting to DB ${err.message}`);
 });
 
-mongoose.connection.once('open', () => {
+mongoose.connection.once("open", () => {
   console.log(`Connected to database`);
   cron.init();
 });
@@ -142,7 +166,8 @@ const schema = buildSchema(`
   }
   input UserSignInInputType {
     emailAddress: String,
-    password: String
+    password: String,
+    userType: userTypeEnum,
   }
   type Query {
     getTodo(id: ID!): Todo,
@@ -177,8 +202,10 @@ class Todo {
 let baseId = 100000;
 
 const root = {
-  async getBookings({ userId, userType }: any) {
+  async getBookings({ userId, userType }: any, message: IncomingMessage) {
     console.log(userId);
+    authorize(message.headers);
+
     const filter: any = {};
     if (userType === userTypeEnum.RIDER) {
       filter.riderId = userId;
@@ -188,47 +215,93 @@ const root = {
     const bookings = await Booking.find(filter);
     return bookings;
   },
-  async getBookingById({ bookingId }: any) {
-    console.log('Search string : ' + bookingId);
+
+  async getBookingById({ bookingId }: any, message: IncomingMessage) {
+    console.log("Search string : " + bookingId);
+    authorize(message.headers);
+
     const booking = await Booking.findOne({ bookingId });
-    console.log('Booking data:', booking);
+    console.log("Booking data:", booking);
     return booking;
   },
-  
-  async createBooking({ bookingData }: any) {
 
-    const bookingId: string = `bid_${Math.floor(
-      1000 + Math.random() * 900000
-    ).toString()}`;
+  // explore params
+  async createBooking({ bookingData }: any, message: IncomingMessage) {
+    authorize(message.headers);
 
-    console.log('booking id is : ' + bookingId);
-
+    const bookingId = getNewId("bid");
     bookingData.bookingId = bookingId;
-    bookingData.partnerId = 'pid_000001';
-    bookingData.vehicleId = 'vid_000001';
+    bookingData.partnerId = "pid_000001";
+    bookingData.vehicleId = "vid_000001";
     bookingData.status = bookingStatusEnum.IN_PROGRESS;
 
     try {
       const booking = await Booking.create(bookingData);
-      console.log('Saved succesffully!', booking);
-      return booking;  
-    } catch(err) {
-      throw new Error('Server issue, could not create a booking! Please try again.');
+      console.log("Saved succesffully!", booking);
+      return booking;
+    } catch (err) {
+      throw new Error(
+        "Server issue, could not create a booking! Please try again."
+      );
     }
   },
 
-  registerUser({ userData }: any) {
+  async registerUser({ userData }: any) {
     console.log(userData);
-    return registerUserResponse;
+    const { userType, password, emailAddress } = userData;
+    if (!userType || !password || !emailAddress) {
+      throw new Error("Mandatory fields missing..");
+    }
+    let userIdPrefix = "aid";
+    if (userType === userTypeEnum.RIDER) {
+      userIdPrefix = "rid";
+    } else if (userType === userTypeEnum.PARTNER) {
+      userIdPrefix = "pid";
+    }
+    // create user id
+    const userId = getNewId(userIdPrefix);
+    userData.userId = userId;
+
+    // encrypt password
+    const hash = encryptPassword(password);
+    userData.password = hash;
+
+    try {
+      const user = await UserModel.create(userData);
+      delete user.password;
+      // tbd password should not be part of response
+      return user;
+    } catch (err) {
+      throw new Error("Unable to register user Please try again..");
+    }
   },
-  signInUser({ userData }: any) {
+
+  async signInUser({ userData }: any) {
     console.log(userData);
-    return registerUserResponse;
+    const { userType, emailAddress, password } = userData;
+    if (!userType || !password || !emailAddress) {
+      throw new Error("Mandatory fields missing..");
+    }
+    try {
+      const user: any = await UserModel.findOne({ userType, emailAddress });
+      const isPasswordCorrect = bcrypt.compareSync(password, user.password);
+
+      // generate token
+      if (!isPasswordCorrect) {
+        throw new Error();
+      }
+      const token = createAccessToken(emailAddress, userType);
+      user.jwt = token;
+      delete user.password;
+      return user;
+    } catch (err) {
+      throw new Error("Wrong password. Please use correct password.");
+    }
   },
 };
 
 app.use(
-  '/graphql',
+  "/graphql",
   graphqlHTTP({
     schema: schema,
     rootValue: root,
@@ -237,9 +310,9 @@ app.use(
 );
 
 //Temporarily catch all the get request and serve static content
-app.get('/', (req: Request, res: Response) => {
+app.get("/", (req: Request, res: Response) => {
   res.send(
-    '<h1><center>Welcome to Fast Travel APIs (Express + TypeScript)..</center></h1>'
+    "<h1><center>Welcome to Fast Travel APIs (Express + TypeScript)..</center></h1>"
   );
 });
 
