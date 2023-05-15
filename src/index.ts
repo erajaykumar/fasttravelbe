@@ -1,18 +1,38 @@
 import express, { Express, Request, Response } from 'express';
 import { graphqlHTTP } from 'express-graphql';
-import { GraphQLString, buildSchema, graphql, GraphQLSchema, GraphQLInt, GraphQLList, GraphQLID, GraphQLObjectType  } from 'graphql';
+import {
+  GraphQLString,
+  buildSchema,
+  graphql,
+  GraphQLSchema,
+  GraphQLInt,
+  GraphQLList,
+  GraphQLID,
+  GraphQLObjectType,
+} from 'graphql';
 import dotenv from 'dotenv';
 import cors from 'cors';
 import mongoose, { Schema } from 'mongoose';
+import Booking from './models/booking';
+import {
+  createBookingResponse,
+  mockBooking,
+  registerUserResponse,
+} from './_data/mockResponses';
+import cron from './controller/bookingsCron';
 import bcrypt from 'bcrypt';
 
-import Booking from './models/booking';
 // import {
 //   createBookingResponse,
 //   mockBooking,
 //   registerUserResponse,
 // } from './_data/mockResponses';
-import { bookingStatusEnum, userTypeEnum, genderEnum, vehicleStatusEnum } from './common/enums';
+import {
+  bookingStatusEnum,
+  userTypeEnum,
+  genderEnum,
+  vehicleStatusEnum,
+} from './common/enums';
 import { UserModel } from './models/user';
 import { getNewId } from './common/utils';
 import { authorize, createAccessToken, encryptPassword } from './common/auth';
@@ -37,6 +57,7 @@ mongoose.connect(MONGODBURI).catch((err) => {
 
 mongoose.connection.once('open', () => {
   console.log(`Connected to database`);
+  cron.init();
 });
 
 //Mongo DB setup ends
@@ -198,12 +219,12 @@ const root = {
   async getBookingById({ bookingId }: any, message: IncomingMessage) {
     console.log('Search string : ' + bookingId);
     authorize(message.headers);
-  
+
     const booking = await Booking.findOne({ bookingId });
     console.log('Booking data:', booking);
     return booking;
   },
-  
+
   // explore params
   async createBooking({ bookingData }: any, message: IncomingMessage) {
     authorize(message.headers);
@@ -217,9 +238,11 @@ const root = {
     try {
       const booking = await Booking.create(bookingData);
       console.log('Saved succesffully!', booking);
-      return booking;  
-    } catch(err) {
-      throw new Error('Server issue, could not create a booking! Please try again.');
+      return booking;
+    } catch (err) {
+      throw new Error(
+        'Server issue, could not create a booking! Please try again.'
+      );
     }
   },
 
@@ -234,25 +257,25 @@ const root = {
       userIdPrefix = 'rid';
     } else if (userType === userTypeEnum.PARTNER) {
       userIdPrefix = 'pid';
-    };
+    }
     // create user id
-    const userId = getNewId(userIdPrefix)
+    const userId = getNewId(userIdPrefix);
     userData.userId = userId;
-    
+
     // encrypt password
-    const hash = encryptPassword(password)
+    const hash = encryptPassword(password);
     userData.password = hash;
-    
+
     try {
       const user = await UserModel.create(userData);
       delete user.password;
       // tbd password should not be part of response
       return user;
-    } catch(err) {
+    } catch (err) {
       throw new Error('Unable to register user Please try again..');
     }
   },
-  
+
   async signInUser({ userData }: any) {
     console.log(userData);
     const { userType, emailAddress, password } = userData;
@@ -262,7 +285,7 @@ const root = {
     try {
       const user: any = await UserModel.findOne({ userType, emailAddress });
       const isPasswordCorrect = bcrypt.compareSync(password, user.password);
-      
+
       // generate token
       if (!isPasswordCorrect) {
         throw new Error();
@@ -271,7 +294,7 @@ const root = {
       user.jwt = token;
       delete user.password;
       return user;
-    } catch(err) {
+    } catch (err) {
       throw new Error('Wrong password. Please use correct password.');
     }
   },
