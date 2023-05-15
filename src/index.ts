@@ -4,14 +4,18 @@ import { GraphQLString, buildSchema, graphql, GraphQLSchema, GraphQLInt, GraphQL
 import dotenv from 'dotenv';
 import cors from 'cors';
 import mongoose, { Schema } from 'mongoose';
+import bcrypt from 'bcrypt';
+
 import Booking from './models/booking';
 import {
   createBookingResponse,
   mockBooking,
   registerUserResponse,
 } from './_data/mockResponses';
-
 import { bookingStatusEnum, userTypeEnum, genderEnum, vehicleStatusEnum } from './common/enums';
+import { UserModel } from './models/user';
+import { getNewId } from './common/utils';
+import { createAccessToken, encryptPassword } from './common/auth';
 
 //load environment variables
 dotenv.config({
@@ -140,7 +144,8 @@ const schema = buildSchema(`
   }
   input UserSignInInputType {
     emailAddress: String,
-    password: String
+    password: String,
+    userType: userTypeEnum,
   }
   type Query {
     getTodo(id: ID!): Todo,
@@ -195,9 +200,7 @@ const root = {
   
   async createBooking({ bookingData }: any) {
 
-    const bookingId: string = `bid_${Math.floor(
-      1000 + Math.random() * 900000
-    ).toString()}`;
+    const bookingId = getNewId('bid');
 
     console.log('booking id is : ' + bookingId);
 
@@ -215,13 +218,57 @@ const root = {
     }
   },
 
-  registerUser({ userData }: any) {
+  async registerUser({ userData }: any) {
     console.log(userData);
-    return registerUserResponse;
+    const { userType, password, emailAddress } = userData;
+    if (!userType || !password || !emailAddress) {
+      throw new Error('Mandatory fields missing..');
+    }
+    let userIdPrefix = 'aid';
+    if (userType === userTypeEnum.RIDER) {
+      userIdPrefix = 'rid';
+    } else if (userType === userTypeEnum.PARTNER) {
+      userIdPrefix = 'pid';
+    };
+    // create user id
+    const userId = getNewId(userIdPrefix)
+    userData.userId = userId;
+    
+    // encrypt password
+    const hash = encryptPassword(password)
+    userData.password = hash;
+    
+    try {
+      const user = await UserModel.create(userData);
+      delete user.password;
+      // tbd password should not be part of response
+      return user;
+    } catch(err) {
+      throw new Error('Unable to register user Please try again..');
+    }
   },
-  signInUser({ userData }: any) {
+  
+  async signInUser({ userData }: any) {
     console.log(userData);
-    return registerUserResponse;
+    const { userType, emailAddress, password } = userData;
+    if (!userType || !password || !emailAddress) {
+      throw new Error('Mandatory fields missing..');
+    }
+    try {
+      const user: any = await UserModel.findOne({ userType, emailAddress });
+      const isPasswordCorrect = bcrypt.compareSync(password, user.password);
+      
+      // generate token
+      if (!isPasswordCorrect) {
+        throw new Error();
+      }
+      const token = createAccessToken(emailAddress, userType);
+      user.jwt = token;
+      delete user.password;
+      return user;
+    } catch(err) {
+      throw new Error('Wrong password. Please use correct password.');
+    }
   },
 };
 
