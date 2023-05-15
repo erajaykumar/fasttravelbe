@@ -7,15 +7,16 @@ import mongoose, { Schema } from 'mongoose';
 import bcrypt from 'bcrypt';
 
 import Booking from './models/booking';
-import {
-  createBookingResponse,
-  mockBooking,
-  registerUserResponse,
-} from './_data/mockResponses';
+// import {
+//   createBookingResponse,
+//   mockBooking,
+//   registerUserResponse,
+// } from './_data/mockResponses';
 import { bookingStatusEnum, userTypeEnum, genderEnum, vehicleStatusEnum } from './common/enums';
 import { UserModel } from './models/user';
 import { getNewId } from './common/utils';
-import { createAccessToken, encryptPassword } from './common/auth';
+import { authorize, createAccessToken, encryptPassword } from './common/auth';
+import { IncomingMessage } from 'http';
 
 //load environment variables
 dotenv.config({
@@ -180,8 +181,10 @@ class Todo {
 let baseId = 100000;
 
 const root = {
-  async getBookings({ userId, userType }: any) {
+  async getBookings({ userId, userType }: any, message: IncomingMessage) {
     console.log(userId);
+    authorize(message.headers);
+
     const filter: any = {};
     if (userType === userTypeEnum.RIDER) {
       filter.riderId = userId;
@@ -191,19 +194,21 @@ const root = {
     const bookings = await Booking.find(filter);
     return bookings;
   },
-  async getBookingById({ bookingId }: any) {
+
+  async getBookingById({ bookingId }: any, message: IncomingMessage) {
     console.log('Search string : ' + bookingId);
+    authorize(message.headers);
+  
     const booking = await Booking.findOne({ bookingId });
     console.log('Booking data:', booking);
     return booking;
   },
   
-  async createBooking({ bookingData }: any) {
+  // explore params
+  async createBooking({ bookingData }: any, message: IncomingMessage) {
+    authorize(message.headers);
 
     const bookingId = getNewId('bid');
-
-    console.log('booking id is : ' + bookingId);
-
     bookingData.bookingId = bookingId;
     bookingData.partnerId = 'pid_000001';
     bookingData.vehicleId = 'vid_000001';
