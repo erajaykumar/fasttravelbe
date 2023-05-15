@@ -4,14 +4,19 @@ import { GraphQLString, buildSchema, graphql, GraphQLSchema, GraphQLInt, GraphQL
 import dotenv from 'dotenv';
 import cors from 'cors';
 import mongoose, { Schema } from 'mongoose';
-import Booking from './models/booking';
-import {
-  createBookingResponse,
-  mockBooking,
-  registerUserResponse,
-} from './_data/mockResponses';
+import bcrypt from 'bcrypt';
 
+import Booking from './models/booking';
+// import {
+//   createBookingResponse,
+//   mockBooking,
+//   registerUserResponse,
+// } from './_data/mockResponses';
 import { bookingStatusEnum, userTypeEnum, genderEnum, vehicleStatusEnum } from './common/enums';
+import { UserModel } from './models/user';
+import { getNewId } from './common/utils';
+import { authorize, createAccessToken, encryptPassword } from './common/auth';
+import { IncomingMessage } from 'http';
 
 //load environment variables
 dotenv.config({
@@ -140,7 +145,8 @@ const schema = buildSchema(`
   }
   input UserSignInInputType {
     emailAddress: String,
-    password: String
+    password: String,
+    userType: userTypeEnum,
   }
   type Query {
     getTodo(id: ID!): Todo,
@@ -175,8 +181,10 @@ class Todo {
 let baseId = 100000;
 
 const root = {
-  async getBookings({ userId, userType }: any) {
+  async getBookings({ userId, userType }: any, message: IncomingMessage) {
     console.log(userId);
+    authorize(message.headers);
+
     const filter: any = {};
     if (userType === userTypeEnum.RIDER) {
       filter.riderId = userId;
@@ -186,21 +194,21 @@ const root = {
     const bookings = await Booking.find(filter);
     return bookings;
   },
-  async getBookingById({ bookingId }: any) {
+
+  async getBookingById({ bookingId }: any, message: IncomingMessage) {
     console.log('Search string : ' + bookingId);
+    authorize(message.headers);
+  
     const booking = await Booking.findOne({ bookingId });
     console.log('Booking data:', booking);
     return booking;
   },
   
-  async createBooking({ bookingData }: any) {
+  // explore params
+  async createBooking({ bookingData }: any, message: IncomingMessage) {
+    authorize(message.headers);
 
-    const bookingId: string = `bid_${Math.floor(
-      1000 + Math.random() * 900000
-    ).toString()}`;
-
-    console.log('booking id is : ' + bookingId);
-
+    const bookingId = getNewId('bid');
     bookingData.bookingId = bookingId;
     bookingData.partnerId = 'pid_000001';
     bookingData.vehicleId = 'vid_000001';
@@ -215,13 +223,57 @@ const root = {
     }
   },
 
-  registerUser({ userData }: any) {
+  async registerUser({ userData }: any) {
     console.log(userData);
-    return registerUserResponse;
+    const { userType, password, emailAddress } = userData;
+    if (!userType || !password || !emailAddress) {
+      throw new Error('Mandatory fields missing..');
+    }
+    let userIdPrefix = 'aid';
+    if (userType === userTypeEnum.RIDER) {
+      userIdPrefix = 'rid';
+    } else if (userType === userTypeEnum.PARTNER) {
+      userIdPrefix = 'pid';
+    };
+    // create user id
+    const userId = getNewId(userIdPrefix)
+    userData.userId = userId;
+    
+    // encrypt password
+    const hash = encryptPassword(password)
+    userData.password = hash;
+    
+    try {
+      const user = await UserModel.create(userData);
+      delete user.password;
+      // tbd password should not be part of response
+      return user;
+    } catch(err) {
+      throw new Error('Unable to register user Please try again..');
+    }
   },
-  signInUser({ userData }: any) {
+  
+  async signInUser({ userData }: any) {
     console.log(userData);
-    return registerUserResponse;
+    const { userType, emailAddress, password } = userData;
+    if (!userType || !password || !emailAddress) {
+      throw new Error('Mandatory fields missing..');
+    }
+    try {
+      const user: any = await UserModel.findOne({ userType, emailAddress });
+      const isPasswordCorrect = bcrypt.compareSync(password, user.password);
+      
+      // generate token
+      if (!isPasswordCorrect) {
+        throw new Error();
+      }
+      const token = createAccessToken(emailAddress, userType);
+      user.jwt = token;
+      delete user.password;
+      return user;
+    } catch(err) {
+      throw new Error('Wrong password. Please use correct password.');
+    }
   },
 };
 
